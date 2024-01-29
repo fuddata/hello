@@ -17,7 +17,7 @@ const helloWorld = `
 `
 
 func main() {
-	err, trialLeft, ordered := license.GetLicenseStatus()
+	err, trialLeft, ordered := license.GetLicenseStatus("HELLOWORLD")
 	if err != nil {
 		color.Red("Error: %s", err)
 		return

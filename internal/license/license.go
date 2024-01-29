@@ -26,6 +26,7 @@ CmxRc1BYU004bHZEVEJLWGw0OHMyQjFQQTRmUDM3MlFheTdMaDBiS1d3L05SQ2
 txT1haZlZESWhpMHc9PQ0KLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tDQo=`
 
 type Request struct {
+	App  string `json:"app"`
 	Type int    `json:"type"`
 	Guid string `json:"guid"`
 }
@@ -35,7 +36,7 @@ type Response struct {
 	Message string `json:"message,omitempty"`
 }
 
-func GetLicenseStatus() (error, int, bool) {
+func GetLicenseStatus(app string) (error, int, bool) {
 	// Read machine guid from registry
 	m, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Cryptography`, registry.QUERY_VALUE)
 	defer m.Close()
@@ -74,7 +75,7 @@ func GetLicenseStatus() (error, int, bool) {
 		// FixMe: Check if part of AD Domain or Azure AD
 		licenseType := 1
 
-		licStatus, licDetail, err := getRemote(licenseType, machineGuid)
+		licStatus, licDetail, err := getRemote(app, machineGuid, licenseType)
 		licenseOrdered := false
 		switch licStatus {
 		case 11:
@@ -134,10 +135,11 @@ func verifyLicKey(data string, sign string) (bool, error) {
 	return ecdsa.VerifyASN1(pk, hash, bSign), nil
 }
 
-func getRemote(licenseType int, guid string) (int, string, error) {
+func getRemote(app, guid string, licenseType int) (int, string, error) {
 	data := Request{
-		Type: licenseType,
+		App:  app,
 		Guid: guid,
+		Type: licenseType,
 	}
 
 	jsonData, err := json.Marshal(data)
