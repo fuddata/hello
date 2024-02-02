@@ -7,6 +7,14 @@ import (
 	"github.com/hello/internal/license"
 )
 
+const licenseApiUrl = "http://192.168.8.40:8790"
+
+const licPubKey = `
+LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0NCk1Ga3dFd1lIS29aSXpqMENBUV
+lJS29aSXpqMERBUWNEUWdBRUtORGdHRm02TmwvYzN4QzNnRlk4NFFTUlB4c2kN
+CmxRc1BYU004bHZEVEJLWGw0OHMyQjFQQTRmUDM3MlFheTdMaDBiS1d3L05SQ2
+txT1haZlZESWhpMHc9PQ0KLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tDQo=`
+
 const helloWorld = `
  _   _      _ _        __        __         _     _
 | | | | ___| | | ___   \ \      / /__  _ __| | __| |
@@ -17,7 +25,7 @@ const helloWorld = `
 `
 
 func main() {
-	err, trialLeft, ordered := license.GetLicenseStatus("HELLOWORLD")
+	err, trialLeft, ordered := license.GetLicenseStatus(licenseApiUrl, "HELLOWORLD", licPubKey)
 	if err != nil {
 		color.Red("Error: %s", err)
 		return

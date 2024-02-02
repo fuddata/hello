@@ -10,20 +10,12 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
 	"golang.org/x/sys/windows/registry"
 )
-
-const licenseApiUrl = "http://192.168.8.40:8790"
-
-const licPubKey = `
-LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0NCk1Ga3dFd1lIS29aSXpqMENBUV
-lJS29aSXpqMERBUWNEUWdBRUtORGdHRm02TmwvYzN4QzNnRlk4NFFTUlB4c2kN
-CmxRc1BYU004bHZEVEJLWGw0OHMyQjFQQTRmUDM3MlFheTdMaDBiS1d3L05SQ2
-txT1haZlZESWhpMHc9PQ0KLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tDQo=`
 
 type Request struct {
 	App  string `json:"app"`
@@ -36,7 +28,7 @@ type Response struct {
 	Message string `json:"message,omitempty"`
 }
 
-func GetLicenseStatus(app string) (error, int, bool) {
+func GetLicenseStatus(apiUrl, app, pubKey string) (error, int, bool) {
 	// Read machine guid from registry
 	m, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Cryptography`, registry.QUERY_VALUE)
 	defer m.Close()
@@ -63,7 +55,7 @@ func GetLicenseStatus(app string) (error, int, bool) {
 	// Validate license key if defined
 	validLicense := false
 	if license != "" {
-		validLicense, err = verifyLicKey(machineGuid, license)
+		validLicense, err = verifyLicKey(apiUrl, machineGuid, pubKey, license)
 		if err != nil {
 			return errors.New(fmt.Sprintf("Verifying license: %s", err)), -1, false
 		}
@@ -75,7 +67,7 @@ func GetLicenseStatus(app string) (error, int, bool) {
 		// FixMe: Check if part of AD Domain or Azure AD
 		licenseType := 1
 
-		licStatus, licDetail, err := getRemote(app, machineGuid, licenseType)
+		licStatus, licDetail, err := getRemote(apiUrl, app, machineGuid, licenseType)
 		licenseOrdered := false
 		switch licStatus {
 		case 11:
@@ -84,7 +76,7 @@ func GetLicenseStatus(app string) (error, int, bool) {
 			licenseOrdered = true
 			firstLaunchDate = licDetail
 		case 13:
-			validLicense, _ = verifyLicKey(machineGuid, licDetail)
+			validLicense, _ = verifyLicKey(apiUrl, machineGuid, pubKey, licDetail)
 			if validLicense {
 				k.SetStringValue("LicenseKey", licDetail)
 				return nil, -1, false
@@ -108,8 +100,8 @@ func GetLicenseStatus(app string) (error, int, bool) {
 	}
 }
 
-func verifyLicKey(data string, sign string) (bool, error) {
-	pubKey, err := base64.StdEncoding.DecodeString(licPubKey)
+func verifyLicKey(apiUrl, data, pKey, sign string) (bool, error) {
+	pubKey, err := base64.StdEncoding.DecodeString(pKey)
 	if err != nil {
 		return false, errors.New(fmt.Sprintf("Decoding public key: %s", err))
 	}
@@ -135,7 +127,7 @@ func verifyLicKey(data string, sign string) (bool, error) {
 	return ecdsa.VerifyASN1(pk, hash, bSign), nil
 }
 
-func getRemote(app, guid string, licenseType int) (int, string, error) {
+func getRemote(apiUrl, app, guid string, licenseType int) (int, string, error) {
 	data := Request{
 		App:  app,
 		Guid: guid,
@@ -147,13 +139,13 @@ func getRemote(app, guid string, licenseType int) (int, string, error) {
 		return -1, "", errors.New(fmt.Sprintf("Marshaling licensing data: %s", err))
 	}
 
-	resp, err := http.Post(licenseApiUrl, "application/json", bytes.NewBuffer(jsonData))
+	resp, err := http.Post(apiUrl, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return -1, "", errors.New(fmt.Sprintf("Sending license status request: %s", err))
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return -1, "", errors.New(fmt.Sprintf("Reading license service response: %s", err))
 	}
