@@ -15,8 +15,7 @@ lJS29aSXpqMERBUWNEUWdBRUtORGdHRm02TmwvYzN4QzNnRlk4NFFTUlB4c2kN
 CmxRc1BYU004bHZEVEJLWGw0OHMyQjFQQTRmUDM3MlFheTdMaDBiS1d3L05SQ2
 txT1haZlZESWhpMHc9PQ0KLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tDQo=`
 
-const helloWorld = `
- _   _      _ _        __        __         _     _
+const helloWorld = ` _   _      _ _        __        __         _     _
 | | | | ___| | | ___   \ \      / /__  _ __| | __| |
 | |_| |/ _ \ | |/ _ \   \ \ /\ / / _ \| '__| |/ _  |
 |  _  |  __/ | | (_) |   \ V  V / (_) | |  | | (_| |
@@ -41,6 +40,6 @@ func main() {
 	}
 
 	color.HiBlue(helloWorld)
-	fmt.Printf("\r\nPress any key to close this window")
+	fmt.Printf("Press any key to close this window")
 	fmt.Scanln()
 }
