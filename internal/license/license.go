@@ -29,65 +29,76 @@ type Response struct {
 }
 
 func GetLicenseStatus(apiUrl, app, pubKey string) (error, int, bool) {
-	// Read machine guid from registry
-	m, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Cryptography`, registry.QUERY_VALUE)
-	defer m.Close()
-	if err != nil {
-		return errors.New("Cannot open Cryptography registry key"), -1, false
-	}
-	machineGuid, _, err := m.GetStringValue("MachineGuid")
-	if err != nil {
-		return errors.New("Cannot read MachineGuid registry value"), -1, false
+
+	// TODO: Check BIOS serial, etc instead of this. Preferably value which is available also in Linux and Mac
+
+	firstLaunchDate := ""
+	license := ""
+	validLicense := false
+	clientGuid := ""
+	licenseType := 1
+
+	clientGuid = getEntraIdTenantId()
+	if clientGuid != "" {
+		fmt.Printf("Using EntraID based license\r\n\r\n")
+		licenseType = 2
+	} else {
+		fmt.Printf("Using computer based license\r\n\r\n")
+
+		// Read machine guid from registry
+		m, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Cryptography`, registry.QUERY_VALUE)
+		if err != nil {
+			return errors.New("cannot open Cryptography registry key"), -1, false
+		}
+		defer m.Close()
+		clientGuid, _, err = m.GetStringValue("MachineGuid")
+		if err != nil {
+			return errors.New("cannot read MachineGuid registry value"), -1, false
+		}
 	}
 
 	// Read license key from registry
-	firstLaunchDate := ""
-	license := ""
 	k, oldKey, err := registry.CreateKey(registry.CURRENT_USER, `SOFTWARE\Fuddata\HelloWorld`, registry.READ+registry.WRITE)
-	defer k.Close()
 	if err != nil {
-		return errors.New("Cannot open HelloWorld registry key"), -1, false
+		return errors.New("cannot open HelloWorld registry key"), -1, false
 	}
+	defer k.Close()
 	if oldKey {
 		license, _, _ = k.GetStringValue("LicenseKey")
 	}
 
 	// Validate license key if defined
-	validLicense := false
 	if license != "" {
-		validLicense, err = verifyLicKey(apiUrl, machineGuid, pubKey, license)
+		validLicense, err = verifyLicKey(apiUrl, clientGuid, pubKey, license)
 		if err != nil {
-			return errors.New(fmt.Sprintf("Verifying license: %s", err)), -1, false
+			return fmt.Errorf("verifying license: %s", err), -1, false
 		}
 	}
 
 	if validLicense {
 		return nil, -1, false
 	} else {
-		// FixMe: Check if part of AD Domain or Azure AD
-		licenseType := 1
-
-		licStatus, licDetail, err := getRemote(apiUrl, app, machineGuid, licenseType)
+		licStatus, licDetail, err := getRemote(apiUrl, app, clientGuid, licenseType)
 		licenseOrdered := false
 		switch licStatus {
-		case 11:
+		case 11, 21:
 			firstLaunchDate = licDetail
-		case 12:
+		case 12, 22:
 			licenseOrdered = true
 			firstLaunchDate = licDetail
-		case 13:
-			validLicense, _ = verifyLicKey(apiUrl, machineGuid, pubKey, licDetail)
+		case 13, 23:
+			validLicense, _ = verifyLicKey(apiUrl, clientGuid, pubKey, licDetail)
 			if validLicense {
 				k.SetStringValue("LicenseKey", licDetail)
 				return nil, -1, false
 			}
 		default:
-			return errors.New(fmt.Sprintf("Unhandled licensing status. Details: %s", err)), -1, false
+			return fmt.Errorf("unhandled licensing status. Details: %s", err), -1, false
 		}
 
 		startDate, err := time.Parse("2006-01-02", firstLaunchDate)
 		if err != nil {
-			return errors.New(fmt.Sprintf("Parsing first launch date: %s", err)), -1, false
+			return fmt.Errorf("parsing first launch date: %s", err), -1, false
 		}
 		currentDate := time.Now()
 		daysPassed := currentDate.Sub(startDate).Hours() / 24
@@ -95,7 +106,7 @@ func GetLicenseStatus(apiUrl, app, pubKey string) (error, int, bool) {
 		if daysLeft > 0 {
 			return nil, daysLeft, licenseOrdered
 		} else {
-			return errors.New("Your trial period has ended."), -1, false
+			return errors.New("your trial period has ended"), -1, false
 		}
 	}
 }
@@ -103,7 +114,7 @@ func GetLicenseStatus(apiUrl, app, pubKey string) (error, int, bool) {
 func verifyLicKey(apiUrl, data, pKey, sign string) (bool, error) {
 	pubKey, err := base64.StdEncoding.DecodeString(pKey)
 	if err != nil {
-		return false, errors.New(fmt.Sprintf("Decoding public key: %s", err))
+		return false, fmt.Errorf("decoding public key: %s", err)
 	}
 
 	block, _ := pem.Decode(pubKey)
@@ -136,25 +147,57 @@ func getRemote(apiUrl, app, guid string, licenseType int) (int, string, error) {
 
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return -1, "", errors.New(fmt.Sprintf("Marshaling licensing data: %s", err))
+		return -1, "", fmt.Errorf("marshaling licensing data: %s", err)
 	}
 
 	resp, err := http.Post(apiUrl, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return -1, "", errors.New(fmt.Sprintf("Sending license status request: %s", err))
+		return -1, "", fmt.Errorf("sending license status request: %s", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return -1, "", errors.New(fmt.Sprintf("Reading license service response: %s", err))
+		return -1, "", fmt.Errorf("reading license service response: %s", err)
 	}
 
 	var responseObj Response
 	err = json.Unmarshal(body, &responseObj)
 	if err != nil {
-		return -1, "", errors.New(fmt.Sprintf("Unmarshaling license service response: %s", err))
+		return -1, "", fmt.Errorf("unmarshaling license service response: %s", err)
 	}
 
 	return responseObj.Status, responseObj.Message, nil
+}
+
+func getEntraIdTenantId() string {
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\CurrentControlSet\Control\CloudDomainJoin\JoinInfo`, registry.ENUMERATE_SUB_KEYS)
+	if err != nil {
+		return ""
+	}
+	defer key.Close()
+
+	subkeys, err := key.ReadSubKeyNames(-1)
+	if err != nil {
+		return ""
+	}
+
+	if len(subkeys) == 0 {
+		return ""
+	}
+
+	joinInfoKey, err := registry.OpenKey(key, subkeys[0], registry.QUERY_VALUE)
+	if err != nil {
+		fmt.Printf("Error opening join info key: %v\n", err)
+		return ""
+	}
+	defer joinInfoKey.Close()
+
+	tenantId, _, err := joinInfoKey.GetStringValue("TenantId")
+	if err != nil {
+		fmt.Printf("Error reading TenantId value: %v\n", err)
+		return ""
+	}
+
+	return tenantId
 }
