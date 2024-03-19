@@ -27,6 +27,8 @@ func main() {
 	err, trialLeft, ordered := license.GetLicenseStatus(licenseApiUrl, "HELLOWORLD", licPubKey)
 	if err != nil {
 		color.Red("Error: %s", err)
+		fmt.Printf("Press any key to close this window")
+		fmt.Scanln()
 		return
 	}
 	if trialLeft != -1 {

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
+  <Identity
+    Name="Fuddata.Hello"
+    Version="1.0.0.0"
+    Publisher="CN=Fuddata Limited, O=Fuddata Limited, L=Birkirkara, C=MT"
+    ProcessorArchitecture="x64"
+  />
+  <Properties>
+    <DisplayName>Hello World</DisplayName>
+    <PublisherDisplayName>hello</PublisherDisplayName>
+    <Description>Hello World</Description>
+    <Logo>logo.png</Logo>
+  </Properties>
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+  <Dependencies>
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.14393.0"
+      MaxVersionTested="10.0.22631.0"
+    />
+  </Dependencies>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust"/>
+  </Capabilities>
+  <Applications>
+    <Application
+      Id="Fuddata.HelloWorld"
+      Executable="hello.exe"
+      EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Hello World"
+        Description="Hello World"
+        Square150x150Logo="logo.png"
+        Square44x44Logo="logo.png"
+        BackgroundColor="#464646"
+      />
+    </Application>
+  </Applications>
+</Package>
