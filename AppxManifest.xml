@@ -22,7 +22,7 @@
   <Dependencies>
     <TargetDeviceFamily
       Name="Windows.Desktop"
-      MinVersion="10.0.14393.0"
+      MinVersion="10.0.19041.0"
       MaxVersionTested="10.0.22631.0"
     />
   </Dependencies>
@@ -33,7 +33,8 @@
     <Application
       Id="Fuddata.HelloWorld"
       Executable="hello.exe"
-      EntryPoint="Windows.FullTrustApplication">
+      uap10:RuntimeBehavior="packagedClassicApp"
+      uap10:TrustLevel="mediumIL">
       <uap:VisualElements
         DisplayName="Hello World"
         Description="Hello World"
