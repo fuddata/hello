@@ -1,47 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Package
-  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
-  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-  xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
-  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
-  <Identity
-    Name="Fuddata.Hello"
-    Version="1.0.0.0"
-    Publisher="CN=Fuddata Limited, O=Fuddata Limited, L=Birkirkara, C=MT"
-    ProcessorArchitecture="x64"
-  />
+<Package  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
+  <Identity Name="Fuddata.Hello" Version="1.0.0.0" Publisher="CN=Fuddata Limited, O=Fuddata Limited, L=Birkirkara, C=MT" ProcessorArchitecture="x64" />
   <Properties>
     <DisplayName>Hello World</DisplayName>
     <PublisherDisplayName>hello</PublisherDisplayName>
     <Description>Hello World</Description>
     <Logo>logo.png</Logo>
+    <uap:SupportedUsers>multiple</uap:SupportedUsers>
   </Properties>
   <Resources>
     <Resource Language="en-us" />
   </Resources>
   <Dependencies>
-    <TargetDeviceFamily
-      Name="Windows.Desktop"
-      MinVersion="10.0.19041.0"
-      MaxVersionTested="10.0.22631.0"
-    />
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.22631.0" />
   </Dependencies>
   <Capabilities>
     <rescap:Capability Name="runFullTrust"/>
+    <rescap:Capability Name="packagedServices" />
+    <rescap:Capability Name="localSystemServices" />
   </Capabilities>
   <Applications>
-    <Application
-      Id="Fuddata.HelloWorld"
-      Executable="hello.exe"
-      uap10:RuntimeBehavior="packagedClassicApp"
-      uap10:TrustLevel="mediumIL">
-      <uap:VisualElements
-        DisplayName="Hello World"
-        Description="Hello World"
-        Square150x150Logo="logo.png"
-        Square44x44Logo="logo.png"
-        BackgroundColor="#464646"
-      />
+    <Application Id="Fuddata.HelloWorld" Executable="hello.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements AppListEntry="none" DisplayName="Hello World" Description="Hello World" Square150x150Logo="logo.png" Square44x44Logo="logo.png" BackgroundColor="transparent" />
+      <Extensions>
+        <desktop6:Extension Category="windows.service" EntryPoint="Windows.FullTrustApplication" Executable="hello.exe">
+          <desktop6:Service Name="hello" StartAccount="localSystem" StartupType="auto" />
+        </desktop6:Extension>
+      </Extensions>
     </Application>
   </Applications>
 </Package>
