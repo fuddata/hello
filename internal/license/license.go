@@ -14,8 +14,18 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/StackExchange/wmi"
 	"golang.org/x/sys/windows/registry"
 )
+
+type Win32_ComputerSystem struct {
+	Manufacturer string
+	Model        string
+}
+
+type Win32_BIOS struct {
+	SerialNumber string
+}
 
 type Request struct {
 	App  string `json:"app"`
@@ -29,32 +39,32 @@ type Response struct {
 }
 
 func GetLicenseStatus(apiUrl, app, pubKey string) (error, int, bool) {
-
-	// TODO: Check BIOS serial, etc instead of this. Preferably value which is available also in Linux and Mac
-
 	firstLaunchDate := ""
 	license := ""
 	validLicense := false
-	clientGuid := ""
+	clientID := ""
 	licenseType := 1
 
-	clientGuid = getEntraIdTenantId()
-	if clientGuid != "" {
+	clientID = getEntraIdTenantId()
+	if clientID != "" {
 		fmt.Printf("Using EntraID based license\r\n\r\n")
 		licenseType = 2
 	} else {
 		fmt.Printf("Using computer based license\r\n\r\n")
 
-		// Read machine guid from registry
-		m, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Cryptography`, registry.QUERY_VALUE)
-		if err != nil {
-			return errors.New("cannot open Cryptography registry key"), -1, false
+		// Generate single machine client ID in format:
+		// Manufacturer|Model|SerialNumber
+		var computerInfo []Win32_ComputerSystem
+		query := "SELECT Manufacturer,Model FROM Win32_ComputerSystem"
+		if err := wmi.Query(query, &computerInfo); err != nil {
+			return errors.New("cannot read BIOS information"), -1, false
 		}
-		defer m.Close()
-		clientGuid, _, err = m.GetStringValue("MachineGuid")
-		if err != nil {
-			return errors.New("cannot read MachineGuid registry value"), -1, false
+		var biosInfo []Win32_BIOS
+		query = "SELECT SerialNumber FROM Win32_BIOS"
+		if err := wmi.Query(query, &biosInfo); err != nil {
+			return errors.New("cannot read BIOS information"), -1, false
 		}
+		clientID = computerInfo[0].Manufacturer + "|" + computerInfo[0].Model + "|" + biosInfo[0].SerialNumber
 	}
 
 	// Read license key from registry
@@ -69,7 +79,7 @@ func GetLicenseStatus(apiUrl, app, pubKey string) (error, int, bool) {
 
 	// Validate license key if defined
 	if license != "" {
-		validLicense, err = verifyLicKey(apiUrl, clientGuid, pubKey, license)
+		validLicense, err = verifyLicKey(apiUrl, clientID, pubKey, license)
 		if err != nil {
 			return fmt.Errorf("verifying license: %s", err), -1, false
 		}
@@ -78,7 +88,7 @@ func GetLicenseStatus(apiUrl, app, pubKey string) (error, int, bool) {
 	if validLicense {
 		return nil, -1, false
 	} else {
-		licStatus, licDetail, err := getRemote(apiUrl, app, clientGuid, licenseType)
+		licStatus, licDetail, err := getRemote(apiUrl, app, clientID, licenseType)
 		licenseOrdered := false
 		switch licStatus {
 		case 11, 21:
@@ -87,7 +97,7 @@ func GetLicenseStatus(apiUrl, app, pubKey string) (error, int, bool) {
 			licenseOrdered = true
 			firstLaunchDate = licDetail
 		case 13, 23:
-			validLicense, _ = verifyLicKey(apiUrl, clientGuid, pubKey, licDetail)
+			validLicense, _ = verifyLicKey(apiUrl, clientID, pubKey, licDetail)
 			if validLicense {
 				k.SetStringValue("LicenseKey", licDetail)
 				return nil, -1, false
