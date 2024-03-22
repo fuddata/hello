@@ -24,7 +24,7 @@ const helloWorld = ` _   _      _ _        __        __         _     _
 `
 
 func main() {
-	err, trialLeft, ordered := license.GetLicenseStatus(licenseApiUrl, "HELLOWORLD", licPubKey)
+	trialLeft, ordered, err := license.GetLicenseStatus(licenseApiUrl, "HELLOWORLD", licPubKey)
 	if err != nil {
 		color.Red("Error: %s", err)
 		return

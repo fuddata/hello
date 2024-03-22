@@ -38,7 +38,7 @@ type Response struct {
 	Message string `json:"message,omitempty"`
 }
 
-func GetLicenseStatus(apiUrl, app, pubKey string) (error, int, bool) {
+func GetLicenseStatus(apiUrl, app, pubKey string) (int, bool, error) {
 	firstLaunchDate := ""
 	license := ""
 	validLicense := false
@@ -57,12 +57,12 @@ func GetLicenseStatus(apiUrl, app, pubKey string) (error, int, bool) {
 		var computerInfo []Win32_ComputerSystem
 		query := "SELECT Manufacturer,Model FROM Win32_ComputerSystem"
 		if err := wmi.Query(query, &computerInfo); err != nil {
-			return errors.New("cannot read BIOS information"), -1, false
+			return -1, false, errors.New("cannot read BIOS information")
 		}
 		var biosInfo []Win32_BIOS
 		query = "SELECT SerialNumber FROM Win32_BIOS"
 		if err := wmi.Query(query, &biosInfo); err != nil {
-			return errors.New("cannot read BIOS information"), -1, false
+			return -1, false, errors.New("cannot read BIOS information")
 		}
 		clientID = computerInfo[0].Manufacturer + "|" + computerInfo[0].Model + "|" + biosInfo[0].SerialNumber
 	}
@@ -70,7 +70,7 @@ func GetLicenseStatus(apiUrl, app, pubKey string) (error, int, bool) {
 	// Read license key from registry
 	k, oldKey, err := registry.CreateKey(registry.CURRENT_USER, `SOFTWARE\Fuddata\HelloWorld`, registry.READ+registry.WRITE)
 	if err != nil {
-		return errors.New("cannot open HelloWorld registry key"), -1, false
+		return -1, false, errors.New("cannot open HelloWorld registry key")
 	}
 	defer k.Close()
 	if oldKey {
@@ -79,49 +79,47 @@ func GetLicenseStatus(apiUrl, app, pubKey string) (error, int, bool) {
 
 	// Validate license key if defined
 	if license != "" {
-		validLicense, err = verifyLicKey(apiUrl, clientID, pubKey, license)
+		validLicense, err = verifyLicKey(clientID, pubKey, license)
 		if err != nil {
-			return fmt.Errorf("verifying license: %s", err), -1, false
+			return -1, false, fmt.Errorf("verifying license: %s", err)
 		}
 	}
 
 	if validLicense {
-		return nil, -1, false
-	} else {
-		licStatus, licDetail, err := getRemote(apiUrl, app, clientID, licenseType)
-		licenseOrdered := false
-		switch licStatus {
-		case 11, 21:
-			firstLaunchDate = licDetail
-		case 12, 22:
-			licenseOrdered = true
-			firstLaunchDate = licDetail
-		case 13, 23:
-			validLicense, _ = verifyLicKey(apiUrl, clientID, pubKey, licDetail)
-			if validLicense {
-				k.SetStringValue("LicenseKey", licDetail)
-				return nil, -1, false
-			}
-		default:
-			return fmt.Errorf("unhandled licensing status. Details: %s", err), -1, false
-		}
-
-		startDate, err := time.Parse("2006-01-02", firstLaunchDate)
-		if err != nil {
-			return fmt.Errorf("parsing first launch date: %s", err), -1, false
-		}
-		currentDate := time.Now()
-		daysPassed := currentDate.Sub(startDate).Hours() / 24
-		daysLeft := 3 - int(daysPassed)
-		if daysLeft > 0 {
-			return nil, daysLeft, licenseOrdered
-		} else {
-			return errors.New("your trial period has ended"), -1, false
-		}
+		return -1, false, nil
 	}
+	licStatus, licDetail, err := getRemote(apiUrl, app, clientID, licenseType)
+	licenseOrdered := false
+	switch licStatus {
+	case 11, 21:
+		firstLaunchDate = licDetail
+	case 12, 22:
+		licenseOrdered = true
+		firstLaunchDate = licDetail
+	case 13, 23:
+		validLicense, _ = verifyLicKey(clientID, pubKey, licDetail)
+		if validLicense {
+			k.SetStringValue("LicenseKey", licDetail)
+			return -1, false, nil
+		}
+	default:
+		return -1, false, fmt.Errorf("unhandled licensing status. Details: %s", err)
+	}
+
+	startDate, err := time.Parse("2006-01-02", firstLaunchDate)
+	if err != nil {
+		return -1, false, fmt.Errorf("parsing first launch date: %s", err)
+	}
+	currentDate := time.Now()
+	daysPassed := currentDate.Sub(startDate).Hours() / 24
+	daysLeft := 3 - int(daysPassed)
+	if daysLeft > 0 {
+		return daysLeft, licenseOrdered, nil
+	}
+	return -1, false, errors.New("your trial period has ended")
 }
 
-func verifyLicKey(apiUrl, data, pKey, sign string) (bool, error) {
+func verifyLicKey(data, pKey, sign string) (bool, error) {
 	pubKey, err := base64.StdEncoding.DecodeString(pKey)
 	if err != nil {
 		return false, fmt.Errorf("decoding public key: %s", err)
